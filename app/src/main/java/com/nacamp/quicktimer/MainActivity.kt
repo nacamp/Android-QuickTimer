@@ -20,8 +20,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             QuickTimerTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
+                    QuickTimerScreen(
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
