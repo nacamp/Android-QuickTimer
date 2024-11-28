@@ -21,7 +21,10 @@ import android.media.RingtoneManager
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -61,16 +64,14 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
     var progress by remember { mutableStateOf(1f) }
     var buttonText by remember { mutableStateOf("Start") }
 
-    var context = LocalContext.current
-    // 타이머 시작
-    val totalMillis = selectedMinutes  * 1000L // 전체 시간 (1분 단위)
+    val context = LocalContext.current
+    val totalMillis = selectedMinutes * 1000L // 전체 시간 (1분 단위)
 
     fun startTimer() {
         isRunning = true
         buttonText = "Stop"
     }
 
-    // 타이머 중지
     fun stopTimer() {
         isRunning = false
         buttonText = "Start"
@@ -80,7 +81,7 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
         LaunchedEffect(Unit) {
             startCoroutineTimer(
                 durationMillis = totalMillis,
-                intervalMillis = 1000L, // 1초 간격
+                intervalMillis = 1000L,
                 onTick = { millisUntilFinished ->
                     timeLeft = millisUntilFinished
                     progress = 1f - millisUntilFinished.toFloat() / totalMillis
@@ -96,44 +97,33 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
         }
     }
 
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 첫 번째 Row: 드롭다운 메뉴로 분 선택
-        if (!isRunning) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Select Minutes", fontSize = 18.sp)
-                //DropdownMenu(selectedMinutes, onMinutesSelected = { selectedMinutes = it })
-            }
-        } else {
-            // 타이머가 동작 중일 때는 선택할 수 없고 숫자가 줄어듬
-            Text(
-                text = "Minutes: ${selectedMinutes}",
-                fontSize = 24.sp,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-        }
+        Spacer(modifier = Modifier.height(24.dp)) // 원과 버튼 사이 간격
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                //.background(Color.Red)
+                .aspectRatio(1f) // 가로/세로 비율을 1:1로 설정
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val diameter = size.minDimension // 정사각형의 최소 크기
+                val strokeWidth = 12.dp.toPx()
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 두 번째 Row: 원형 타이머
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(200.dp)) {
-            Canvas(modifier = Modifier.size(200.dp)) {
+                // 배경 원
                 drawCircle(
                     color = Color.LightGray,
-                    style = Stroke(12.dp.toPx(), cap = StrokeCap.Round)
+                    style = Stroke(strokeWidth, cap = StrokeCap.Round),
+                    radius = diameter / 2, // - strokeWidth / 2,
+                    center = size.center
                 )
-//                Log.d("progress", drawContext.size.toString())
-//                Log.d("progress", 200.dp.toPx().toString())
+
+                // 진행 Arc
                 drawArc(
                     brush = Brush.linearGradient(
                         colors = listOf(
@@ -142,23 +132,27 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
                         start = Offset.Zero,
                         end = Offset.Infinite,
                     ),
-//                    color = Color.Blue,
                     startAngle = -90f,
                     sweepAngle = 360 * progress,
                     useCenter = false,
-                    size = drawContext.size,
-                    style = Stroke(12.dp.toPx(), cap = StrokeCap.Round)
+                    size = Size(diameter, diameter), // 정사각형 크기 설정
+                    style = Stroke(strokeWidth, cap = StrokeCap.Round),
+//                    topLeft = Offset(
+//                        (size.width - diameter) / 2, // 가로 중심
+//                        (size.height - diameter) / 2 // 세로 중심
+//                    )
                 )
             }
+
+            // 중앙 텍스트
             Text(
                 text = "${(timeLeft / 1000 / 60).toInt()} : ${(timeLeft / 1000 % 60).toInt()}",
                 fontSize = 24.sp
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp)) // 원과 버튼 사이 간격
 
-        // 세 번째 Row: 시작/정지/종료 버튼
         Button(
             onClick = {
                 if (!isRunning) {
@@ -167,9 +161,12 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
                     stopTimer()
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp) // 버튼 좌우 간격
         ) {
             Text(buttonText)
         }
     }
 }
+
