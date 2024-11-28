@@ -39,6 +39,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.delay
 import com.chargemap.compose.numberpicker.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 fun playNotificationSound(context: Context) {
     // 기본 알림 소리 URI 가져오기
@@ -73,28 +75,30 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
     var isRunning by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(1f) }
     var buttonText by remember { mutableStateOf("Start") }
-
-    var selectedMinutes by remember { mutableStateOf(5) }
+    var buttonState by remember { mutableStateOf("Start") } // 버튼 상태 관리
+    var selectedMinutes by remember { mutableStateOf(10) }
 
     val context = LocalContext.current
     val totalMillis = selectedMinutes  * 1000L // 전체 시간 (1분 단위)
 
     //var state by remember { mutableStateOf(30) }
+    var coroutineScope = rememberCoroutineScope()
+    var timerJob by remember { mutableStateOf<Job?>(null) } // Coroutine 타이머 작업 추적
 
+
+    fun startTimer2() {
+        isRunning = true
+        buttonState = "Running"
+        Log.d("buttonState:start", buttonState)
+//        buttonText = "Stop"
+    }
     fun startTimer() {
         isRunning = true
-        buttonText = "Stop"
-    }
-
-    fun stopTimer() {
-        isRunning = false
-        buttonText = "Start"
-    }
-
-    if (isRunning) {
-        LaunchedEffect(Unit) {
+        buttonState = "Running" // Start 이후 Cancel, Pause로 전환
+        timeLeft = if (timeLeft > 0) timeLeft else totalMillis // 이전 시간 또는 전체 시간
+        timerJob = coroutineScope.launch {
             startCoroutineTimer(
-                durationMillis = totalMillis,
+                durationMillis = timeLeft,
                 intervalMillis = 1000L,
                 onTick = { millisUntilFinished ->
                     timeLeft = millisUntilFinished
@@ -104,12 +108,48 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
                     timeLeft = 0
                     progress = 1f
                     isRunning = false
-                    buttonText = "Start"
+                    buttonState = "Start"
                     playNotificationSound(context)
                 }
             )
         }
     }
+
+    fun pauseTimer() {
+        isRunning = false
+        buttonState = "Restart"
+        timerJob?.cancel() // 타이머 정지
+    }
+
+    fun cancelTimer() {
+        isRunning = false
+        buttonState = "Start"
+        timeLeft = 0L
+        progress = 0f
+        timerJob?.cancel() // 타이머 정지 및 초기화
+    }
+
+
+//    if (isRunning) {
+//        LaunchedEffect(Unit) {
+//            startCoroutineTimer(
+//                durationMillis = totalMillis,
+//                intervalMillis = 1000L,
+//                onTick = { millisUntilFinished ->
+//                    timeLeft = millisUntilFinished
+//                    progress = 1f - millisUntilFinished.toFloat() / totalMillis
+//                },
+//                onFinish = {
+//                    timeLeft = 0
+//                    progress = 1f
+//                    isRunning = false
+//                    //buttonText = "Start"
+//                    buttonState = "Start"
+//                    playNotificationSound(context)
+//                }
+//            )
+//        }
+//    }
 
     Column(
         modifier = Modifier
@@ -157,17 +197,19 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
 //                    )
                 )
             }
-            if (isRunning) {
-                // 중앙 텍스트
-                Text(
-                    text = "${(timeLeft / 1000 / 60).toInt()} : ${(timeLeft / 1000 % 60).toInt()}",
-                    fontSize = 24.sp
-                )
-            }else{
-                Row(
-                    modifier = Modifier,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+            Row(
+                modifier = Modifier,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (isRunning || buttonState == "Restart") {
+                    // 중앙 텍스트
+                    Text(
+                        text = "${(timeLeft / 1000 / 60).toInt()} : ${(timeLeft / 1000 % 60).toInt()}",
+                        fontSize = 24.sp
+                    )
+                } else {
+                    // 시간 선택 UI
+
                     NumberPicker(
                         value = selectedMinutes,
                         range = 0..90,
@@ -175,25 +217,123 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
                             selectedMinutes = it
                         }
                     )
-                    Text(text ="분")
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Button(
-                        onClick = {
-                            if (!isRunning) {
-                                startTimer()
-                            } else {
-                                stopTimer()
-                            }
-                        },
-//                        modifier = Modifier
-//                            //.fillMaxWidth()
-//                            .padding(horizontal = 2.dp) // 버튼 좌우 간격
+                    Text(text = "분")
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                when (buttonState) {
+                    "Start" -> Button(
+                        onClick = { startTimer() }
                     ) {
-                        Text(buttonText)
+                        Text("Start")
                     }
 
+                    "Running" -> {
+                        Button(
+                            onClick = { pauseTimer()  }
+                        ) {
+                            Text("Pause")
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Button(
+                            onClick = { cancelTimer()  }
+                        ) {
+                            Text("Cancel")
+                        }
+                    }
+
+                    "Restart" -> {
+                        Button(
+                            onClick = { startTimer() }
+                        ) {
+                            Text("Restart")
+                        }
+                        Button(
+                            onClick = { cancelTimer()  }
+                        ) {
+                            Text("Cancel")
+                        }
+                    }
                 }
+
             }
+
+//            if (isRunning) {
+//                // 중앙 텍스트
+//                Text(
+//                    text = "${(timeLeft / 1000 / 60).toInt()} : ${(timeLeft / 1000 % 60).toInt()}",
+//                    fontSize = 24.sp
+//                )
+//            }else{
+//                Row(
+//                    modifier = Modifier,
+//                    verticalAlignment = Alignment.CenterVertically,
+//                ) {
+//                    NumberPicker(
+//                        value = selectedMinutes,
+//                        range = 0..90,
+//                        onValueChange = {
+//                            selectedMinutes = it
+//                        }
+//                    )
+//                    Text(text ="Min")
+//                    Spacer(modifier = Modifier.width(10.dp))
+//                    // 버튼 그룹
+//                    Row(
+//                        //modifier = Modifier.fillMaxWidth(),
+//                        horizontalArrangement = Arrangement.SpaceEvenly
+//                    ) {
+//                        Log.d("buttonState", buttonState)
+//                        when (buttonState) {
+//                            "Start" -> Button(
+//                                onClick = { startTimer() }
+//                            ) {
+//                                Text("Start")
+//                            }
+//
+//                            "Running" -> {
+//                                Button(
+//                                    onClick = {   }
+//                                ) {
+//                                    Text("Pause")
+//                                }
+//                                Button(
+//                                    onClick = {   }
+//                                ) {
+//                                    Text("Cancel")
+//                                }
+//                            }
+//
+//                            "Restart" -> {
+//                                Button(
+//                                    onClick = { startTimer() }
+//                                ) {
+//                                    Text("Restart")
+//                                }
+//                                Button(
+//                                    onClick = {   }
+//                                ) {
+//                                    Text("Cancel")
+//                                }
+//                            }
+//                        }
+//                    }
+////                    Button(
+////                        onClick = {
+////                            if (!isRunning) {
+////                                startTimer()
+////                            } else {
+////                                stopTimer()
+////                            }
+////                        },
+//////                        modifier = Modifier
+//////                            //.fillMaxWidth()
+//////                            .padding(horizontal = 2.dp) // 버튼 좌우 간격
+////                    ) {
+////                        Text(buttonText)
+////                    }
+//
+//                }
+//            }
         }
 
         Spacer(modifier = Modifier.height(24.dp)) // 원과 버튼 사이 간격
