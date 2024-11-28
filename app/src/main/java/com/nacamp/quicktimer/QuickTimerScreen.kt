@@ -21,7 +21,14 @@ import android.media.RingtoneManager
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+//import android.widget.NumberPicker
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
@@ -29,7 +36,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.delay
+import com.chargemap.compose.numberpicker.*
 
 fun playNotificationSound(context: Context) {
     // 기본 알림 소리 URI 가져오기
@@ -56,16 +65,21 @@ suspend fun startCoroutineTimer(
     onFinish()
 }
 
+
 @Composable
 fun QuickTimerScreen(modifier: Modifier = Modifier) {
-    var selectedMinutes by remember { mutableStateOf(5) }
+    //var selectedMinutes by remember { mutableStateOf(5) }
     var timeLeft by remember { mutableStateOf(0L) }
     var isRunning by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(1f) }
     var buttonText by remember { mutableStateOf("Start") }
 
+    var selectedMinutes by remember { mutableStateOf(5) }
+
     val context = LocalContext.current
-    val totalMillis = selectedMinutes * 1000L // 전체 시간 (1분 단위)
+    val totalMillis = selectedMinutes  * 1000L // 전체 시간 (1분 단위)
+
+    //var state by remember { mutableStateOf(30) }
 
     fun startTimer() {
         isRunning = true
@@ -90,7 +104,7 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
                     timeLeft = 0
                     progress = 1f
                     isRunning = false
-                    buttonText = "Restart"
+                    buttonText = "Start"
                     playNotificationSound(context)
                 }
             )
@@ -143,30 +157,47 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
 //                    )
                 )
             }
+            if (isRunning) {
+                // 중앙 텍스트
+                Text(
+                    text = "${(timeLeft / 1000 / 60).toInt()} : ${(timeLeft / 1000 % 60).toInt()}",
+                    fontSize = 24.sp
+                )
+            }else{
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    NumberPicker(
+                        value = selectedMinutes,
+                        range = 0..90,
+                        onValueChange = {
+                            selectedMinutes = it
+                        }
+                    )
+                    Text(text ="분")
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Button(
+                        onClick = {
+                            if (!isRunning) {
+                                startTimer()
+                            } else {
+                                stopTimer()
+                            }
+                        },
+//                        modifier = Modifier
+//                            //.fillMaxWidth()
+//                            .padding(horizontal = 2.dp) // 버튼 좌우 간격
+                    ) {
+                        Text(buttonText)
+                    }
 
-            // 중앙 텍스트
-            Text(
-                text = "${(timeLeft / 1000 / 60).toInt()} : ${(timeLeft / 1000 % 60).toInt()}",
-                fontSize = 24.sp
-            )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp)) // 원과 버튼 사이 간격
-
-        Button(
-            onClick = {
-                if (!isRunning) {
-                    startTimer()
-                } else {
-                    stopTimer()
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp) // 버튼 좌우 간격
-        ) {
-            Text(buttonText)
-        }
     }
 }
+
 
