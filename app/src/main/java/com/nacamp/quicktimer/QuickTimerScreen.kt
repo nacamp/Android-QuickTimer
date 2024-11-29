@@ -20,10 +20,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.delay
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.chargemap.compose.numberpicker.*
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
 fun playNotificationSound(context: Context) {
     // 기본 알림 소리 URI 가져오기
@@ -36,71 +34,21 @@ fun playNotificationSound(context: Context) {
     //ringtone.stop()
 }
 
-suspend fun startCoroutineTimer(
-    durationMillis: Long,
-    intervalMillis: Long,
-    onTick: (Long) -> Unit,
-    onFinish: () -> Unit
-) {
-    var remainingTime = durationMillis
-    while (remainingTime > 0) {
-        onTick(remainingTime)
-        delay(intervalMillis)
-        remainingTime -= intervalMillis
-    }
-    onFinish()
-}
-
-
 @Composable
-fun QuickTimerScreen(modifier: Modifier = Modifier) {
-    var timeLeft by remember { mutableStateOf(0L) }
-    var isRunning by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf(1f) }
-    var buttonState by remember { mutableStateOf("Start") } // 버튼 상태 관리
-    var selectedMinutes by remember { mutableStateOf(1) }
-
+fun QuickTimerScreen(modifier: Modifier = Modifier, viewModel: QuickTimerViewModel = viewModel()) {
+    val timeLeft by viewModel.timeLeft
+    val isRunning by viewModel.isRunning
+    val buttonState by viewModel.buttonState
+    val selectedMinutes by viewModel.selectedMinutes
+    val progress by remember { derivedStateOf { 1f - timeLeft.toFloat() / (selectedMinutes * 1000L) } }
+    val onTimerFinish by viewModel.onTimerFinish.collectAsState()
     val context = LocalContext.current
-    val totalMillis = selectedMinutes * 60 * 1000L // 전체 시간 (1분 단위)
 
-    val coroutineScope = rememberCoroutineScope()
-    var timerJob by remember { mutableStateOf<Job?>(null) } // Coroutine 타이머 작업 추적
-
-    fun startTimer() {
-        isRunning = true
-        buttonState = "Running" // Start 이후 Cancel, Pause로 전환
-        timeLeft = if (timeLeft > 0) timeLeft else totalMillis // 이전 시간 또는 전체 시간
-        timerJob = coroutineScope.launch {
-            startCoroutineTimer(
-                durationMillis = timeLeft,
-                intervalMillis = 1000L,
-                onTick = { millisUntilFinished ->
-                    timeLeft = millisUntilFinished
-                    progress = 1f - millisUntilFinished.toFloat() / totalMillis
-                },
-                onFinish = {
-                    timeLeft = 0
-                    progress = 1f
-                    isRunning = false
-                    buttonState = "Start"
-                    playNotificationSound(context)
-                }
-            )
+    LaunchedEffect(onTimerFinish) {
+        if (onTimerFinish) {
+            playNotificationSound(context)
+            viewModel.resetTimer() // 알람 후 타이머 초기화
         }
-    }
-
-    fun pauseTimer() {
-        isRunning = false
-        buttonState = "Restart"
-        timerJob?.cancel() // 타이머 정지
-    }
-
-    fun cancelTimer() {
-        isRunning = false
-        buttonState = "Start"
-        timeLeft = 0L
-        progress = 0f
-        timerJob?.cancel() // 타이머 정지 및 초기화
     }
 
     Column(
@@ -151,7 +99,7 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
                 modifier = Modifier,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (isRunning || buttonState == "Restart") {
+                if (isRunning || buttonState == "Paused") {
                     // 중앙 텍스트
                     Text(
                         text = "${(timeLeft / 1000 / 60).toInt()} : ${(timeLeft / 1000 % 60).toInt()}",
@@ -161,8 +109,8 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
                     NumberPicker(
                         value = selectedMinutes,
                         range = 0..90,
-                        onValueChange = {
-                            selectedMinutes = it
+                        onValueChange = { newMinutes ->
+                            viewModel.updateSelectedMinutes(newMinutes)
                         }
                     )
                     Text(text = "Min")
@@ -170,33 +118,33 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
                 Spacer(modifier = Modifier.width(10.dp))
                 when (buttonState) {
                     "Start" -> Button(
-                        onClick = { startTimer() }
+                        onClick = { viewModel.startTimer() }
                     ) {
                         Text("Start")
                     }
 
                     "Running" -> {
                         Button(
-                            onClick = { pauseTimer() }
+                            onClick = { viewModel.pauseTimer() }
                         ) {
                             Text("Pause")
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Button(
-                            onClick = { cancelTimer() }
+                            onClick = { viewModel.cancelTimer() }
                         ) {
                             Text("Cancel")
                         }
                     }
 
-                    "Restart" -> {
+                    "Paused" -> {
                         Button(
-                            onClick = { startTimer() }
+                            onClick = { viewModel.startTimer() }
                         ) {
                             Text("Restart")
                         }
                         Button(
-                            onClick = { cancelTimer() }
+                            onClick = { viewModel.cancelTimer() }
                         ) {
                             Text("Cancel")
                         }
@@ -207,5 +155,4 @@ fun QuickTimerScreen(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(24.dp)) // 원과 버튼 사이 간격
     }
 }
-
 
