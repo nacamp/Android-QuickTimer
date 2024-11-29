@@ -39,9 +39,10 @@ fun playNotificationSound(context: Context) {
 
 @Composable
 fun QuickTimerScreen(modifier: Modifier = Modifier, viewModel: QuickTimerViewModel = viewModel()) {
-    val timeLeft by viewModel.timeLeft
-    val isRunning by viewModel.isRunning
-    val buttonState by viewModel.buttonState
+    val timeLeft by viewModel.timeLeft.collectAsState()
+    val isRunning by viewModel.isRunning.collectAsState()
+    val buttonState by viewModel.buttonState.collectAsState()
+
     val selectedMinutes by viewModel.selectedMinutes
     val progress by remember { derivedStateOf { 1f - timeLeft.toFloat() / (selectedMinutes * 60 * 1000L) } }
     val startTime by viewModel.startTime
@@ -56,7 +57,6 @@ fun QuickTimerScreen(modifier: Modifier = Modifier, viewModel: QuickTimerViewMod
             }
         }
     }
-
 
     LaunchedEffect(onTimerFinish) {
         if (onTimerFinish) {

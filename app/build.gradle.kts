@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.nacamp.quicktimer"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.nacamp.quicktimer"
@@ -68,4 +68,5 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation(libs.numberpicker)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.core)
 }

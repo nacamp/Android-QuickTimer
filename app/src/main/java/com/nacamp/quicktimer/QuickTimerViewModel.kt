@@ -1,6 +1,14 @@
 package com.nacamp.quicktimer
 
+import android.app.Application
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
+import android.util.Log
 import androidx.compose.runtime.*
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
@@ -10,16 +18,23 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-class QuickTimerViewModel : ViewModel() {
+class QuickTimerViewModel(application: Application) : AndroidViewModel(application) {
+    private val context = getApplication<Application>().applicationContext
+    private var serviceBound = false
+    private var serviceConnection: ServiceConnection? = null
+    private var timerService: QuickTimerService? = null
+
+    private val _timeLeft = MutableStateFlow(0L)
+    val timeLeft = _timeLeft.asStateFlow()
+
+    private val _isRunning = MutableStateFlow(false)
+    val isRunning = _isRunning.asStateFlow()
+
+    private val _buttonState = MutableStateFlow("Start")
+    val buttonState = _buttonState.asStateFlow()
+
+    private val timerHelper = TimerHelper(viewModelScope)
     private var timerJob: Job? = null
-    private val _timeLeft = mutableStateOf(0L)
-    val timeLeft: State<Long> get() = _timeLeft
-
-    private val _isRunning = mutableStateOf(false)
-    val isRunning: State<Boolean> get() = _isRunning
-
-    private val _buttonState = mutableStateOf("Start")
-    val buttonState: State<String> get() = _buttonState
 
     private val _selectedMinutes = mutableStateOf(5) // 초기값 설정
     val selectedMinutes: State<Int> get() = _selectedMinutes
@@ -41,48 +56,77 @@ class QuickTimerViewModel : ViewModel() {
     }
 
     fun startTimer() {
-        if (timerJob?.isActive == true) return
-        _timeLeft.value = if (_timeLeft.value > 0) _timeLeft.value else totalMillis
-        if(_timeLeft.value == totalMillis) {
+        if (!serviceBound) {
+            Intent(context, QuickTimerService::class.java).apply {
+                putExtra("DURATION_MILLIS", totalMillis)
+                context.startForegroundService(this)
+            }
+            bindToService{
+                _startTime.value = System.currentTimeMillis()
+                timerService?.startTimer()
+            }
+        }else{
             _startTime.value = System.currentTimeMillis()
-        }
-        _isRunning.value = true
-        _buttonState.value = "Running"
-        timerJob = viewModelScope.launch {
-            var remainingTime = _timeLeft.value.takeIf { it > 0 } ?: totalMillis // 남은 시간 또는 전체 시간
-            while (remainingTime > 0 && isActive) {
-                delay(1000L)
-                remainingTime -= 1000L
-                _timeLeft.value = remainingTime
-            }
-            if (remainingTime <= 0) {
-                _isRunning.value = false
-                _buttonState.value = "Start"
-                _onTimerFinish.value = true
-                _endTime.value = System.currentTimeMillis()
-            }
+            timerService?.startTimer()
         }
     }
 
     fun pauseTimer() {
-        _isRunning.value = false
-        _buttonState.value = "Paused"
-        timerJob?.cancel() // 현재 타이머를 중단
+        timerService?.pauseTimer()
     }
 
     fun cancelTimer() {
-        _isRunning.value = false
-        _buttonState.value = "Start"
-        _timeLeft.value = totalMillis
-        timerJob?.cancel()
-        _startTime.value = null // 시작 시간 초기화
-        _endTime.value = null // 종료 시간 초기화
+        timerService?.cancelTimer()
     }
 
     fun resetTimer() {
-        _isRunning.value = false
-        _buttonState.value = "Start"
-        _timeLeft.value = totalMillis
-        _onTimerFinish.value = false // 이벤트 초기화
+        timerService?.resetTimer()
+    }
+
+    private fun bindToService(onConnected: () -> Unit) {
+        if (!serviceBound) {
+            Log.d("QuickTimerViewModel", "bindToService")
+            val connection = object : ServiceConnection {
+                override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                    val binder = service as QuickTimerService.LocalBinder
+                    timerService = binder.getService()
+                    serviceBound = true
+                    onConnected()
+
+                    viewModelScope.launch {
+                        timerService?.timeLeft?.collect { remainingTime ->
+                            _timeLeft.value = remainingTime
+                        }
+                    }
+
+                    viewModelScope.launch {
+                        timerService?.isRunning?.collect { runningState ->
+                            _isRunning.value = runningState
+                        }
+                    }
+
+                    viewModelScope.launch {
+                        timerService?.buttonState?.collect { state ->
+                            _buttonState.value = state
+                        }
+                    }
+
+
+                }
+
+                override fun onServiceDisconnected(name: ComponentName?) {
+                    serviceBound = false
+                }
+            }
+            context.bindService(Intent(context, QuickTimerService::class.java), connection, Context.BIND_AUTO_CREATE)
+            serviceConnection = connection
+        }
+    }
+
+    private fun unbindFromService() {
+        if (serviceBound) {
+            context.unbindService(serviceConnection!!)
+            serviceBound = false
+        }
     }
 }
