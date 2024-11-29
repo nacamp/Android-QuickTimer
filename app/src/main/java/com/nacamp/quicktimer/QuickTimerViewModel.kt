@@ -24,8 +24,14 @@ class QuickTimerViewModel : ViewModel() {
     private val _selectedMinutes = mutableStateOf(5) // 초기값 설정
     val selectedMinutes: State<Int> get() = _selectedMinutes
 
+    private val _startTime = mutableStateOf<Long?>(null) // 시작 시간 (Epoch milliseconds)
+    val startTime: State<Long?> get() = _startTime
+
+    private val _endTime = mutableStateOf<Long?>(null) // 종료 시간 (Epoch milliseconds)
+    val endTime: State<Long?> get() = _endTime
+
     private val totalMillis: Long
-        get() = _selectedMinutes.value * 1000L // 항상 최신 값을 계산
+        get() = _selectedMinutes.value * 60 * 1000L // 항상 최신 값을 계산
 
     private val _onTimerFinish = MutableStateFlow(false) // 타이머 완료 이벤트
     val onTimerFinish = _onTimerFinish.asStateFlow()
@@ -37,6 +43,9 @@ class QuickTimerViewModel : ViewModel() {
     fun startTimer() {
         if (timerJob?.isActive == true) return
         _timeLeft.value = if (_timeLeft.value > 0) _timeLeft.value else totalMillis
+        if(_timeLeft.value == totalMillis) {
+            _startTime.value = System.currentTimeMillis()
+        }
         _isRunning.value = true
         _buttonState.value = "Running"
         timerJob = viewModelScope.launch {
@@ -50,6 +59,7 @@ class QuickTimerViewModel : ViewModel() {
                 _isRunning.value = false
                 _buttonState.value = "Start"
                 _onTimerFinish.value = true
+                _endTime.value = System.currentTimeMillis()
             }
         }
     }
@@ -65,6 +75,8 @@ class QuickTimerViewModel : ViewModel() {
         _buttonState.value = "Start"
         _timeLeft.value = totalMillis
         timerJob?.cancel()
+        _startTime.value = null // 시작 시간 초기화
+        _endTime.value = null // 종료 시간 초기화
     }
 
     fun resetTimer() {

@@ -22,6 +22,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.chargemap.compose.numberpicker.*
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 fun playNotificationSound(context: Context) {
     // 기본 알림 소리 URI 가져오기
@@ -40,9 +43,20 @@ fun QuickTimerScreen(modifier: Modifier = Modifier, viewModel: QuickTimerViewMod
     val isRunning by viewModel.isRunning
     val buttonState by viewModel.buttonState
     val selectedMinutes by viewModel.selectedMinutes
-    val progress by remember { derivedStateOf { 1f - timeLeft.toFloat() / (selectedMinutes * 1000L) } }
+    val progress by remember { derivedStateOf { 1f - timeLeft.toFloat() / (selectedMinutes * 60 * 1000L) } }
+    val startTime by viewModel.startTime
+    val endTime by viewModel.endTime
     val onTimerFinish by viewModel.onTimerFinish.collectAsState()
     val context = LocalContext.current
+
+    val elapsedTime = remember(startTime, endTime) {
+        startTime?.let { start ->
+            endTime?.let { end ->
+                end - start
+            }
+        }
+    }
+
 
     LaunchedEffect(onTimerFinish) {
         if (onTimerFinish) {
@@ -57,7 +71,29 @@ fun QuickTimerScreen(modifier: Modifier = Modifier, viewModel: QuickTimerViewMod
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(24.dp)) // 원과 버튼 사이 간격
+
+        // 시작 시간, 종료 시간, 차이 표시
+        Text(
+            text = "Start Time: ${startTime?.let { SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(
+                Date(it)
+            ) } ?: "Not Started"}",
+            fontSize = 16.sp
+        )
+        Text(
+            text = "End Time: ${endTime?.let { SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(it)) } ?: "Not Ended"}",
+            fontSize = 16.sp
+        )
+        Text(
+            text = "Elapsed Time: ${
+                elapsedTime?.let { millis ->
+                    String.format("%02d:%02d:%02d", millis / 3600000, (millis % 3600000) / 60000, (millis % 60000) / 1000)
+                } ?: "N/A"
+            }",
+            fontSize = 16.sp
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
