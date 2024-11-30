@@ -13,6 +13,8 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,8 +61,11 @@ class QuickTimerViewModel(application: Application) : AndroidViewModel(applicati
         _selectedMinutes.value = savedMinutes
     }
 
+    private var mediaPlayer: MediaPlayerHelper? = null
     init {
         loadSelectedMinutes()
+        mediaPlayer = MediaPlayerHelper(context)
+        mediaPlayer?.prepare()
     }
 
     fun updateSelectedMinutes(minutes: Int) {
@@ -89,6 +94,12 @@ class QuickTimerViewModel(application: Application) : AndroidViewModel(applicati
                 _onTimerFinish.value = true
                 _endTime.value = System.currentTimeMillis()
                 showFullScreenNotification(context)
+                mediaPlayer?.start()
+                // 10초 후 알림 중단
+                CoroutineScope(Dispatchers.Main).launch {
+                    delay(3_000L) // 10초 대기
+                    mediaPlayer?.release() // 알림 중단
+                }
             }
         }
     }
