@@ -42,10 +42,26 @@ class QuickTimerViewModel(application: Application) : AndroidViewModel(applicati
     val endTime: State<Long?> get() = _endTime
 
     private val totalMillis: Long
-        get() = _selectedMinutes.value  * 1000L // 항상 최신 값을 계산
+        get() = _selectedMinutes.value   * 1000L // 항상 최신 값을 계산
 
     private val _onTimerFinish = MutableStateFlow(false) // 타이머 완료 이벤트
     val onTimerFinish = _onTimerFinish.asStateFlow()
+
+    fun saveSelectedMinutes(minutes: Int) {
+        val sharedPreferences = context.getSharedPreferences("QuickTimerPrefs", Context.MODE_PRIVATE)
+        sharedPreferences.edit().putInt("SELECTED_MINUTES", minutes).apply()
+        _selectedMinutes.value = minutes
+    }
+
+    fun loadSelectedMinutes() {
+        val sharedPreferences = context.getSharedPreferences("QuickTimerPrefs", Context.MODE_PRIVATE)
+        val savedMinutes = sharedPreferences.getInt("SELECTED_MINUTES", 5) // 기본값은 5
+        _selectedMinutes.value = savedMinutes
+    }
+
+    init {
+        loadSelectedMinutes()
+    }
 
     fun updateSelectedMinutes(minutes: Int) {
         _selectedMinutes.value = minutes
@@ -53,6 +69,7 @@ class QuickTimerViewModel(application: Application) : AndroidViewModel(applicati
 
     fun startTimer() {
         if (timerJob?.isActive == true) return
+        saveSelectedMinutes(_selectedMinutes.value) // 선택한 시간 저장
         _timeLeft.value = if (_timeLeft.value > 0) _timeLeft.value else totalMillis
         if(_timeLeft.value == totalMillis) {
             _startTime.value = System.currentTimeMillis()
