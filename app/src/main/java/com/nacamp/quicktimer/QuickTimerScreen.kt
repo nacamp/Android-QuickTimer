@@ -9,9 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import android.media.Ringtone
-import android.media.RingtoneManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -25,16 +24,15 @@ import com.chargemap.compose.numberpicker.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.provider.Settings
 
-fun playNotificationSound(context: Context) {
-    // 기본 알림 소리 URI 가져오기
-    val notification: Uri =
-        RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)//.TYPE_ALARM)
-
-    // Ringtone 객체 생성 및 알림 소리 재생
-    val ringtone: Ringtone = RingtoneManager.getRingtone(context, notification)
-    ringtone.play()
-    //ringtone.stop()
+fun requestOverlayPermission(context: Context) {
+    if (!Settings.canDrawOverlays(context)) {
+        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+            data = Uri.parse("package:${context.packageName}")
+        }
+        context.startActivity(intent)
+    }
 }
 
 @Composable
@@ -49,6 +47,13 @@ fun QuickTimerScreen(modifier: Modifier = Modifier, viewModel: QuickTimerViewMod
     val onTimerFinish by viewModel.onTimerFinish.collectAsState()
     val context = LocalContext.current
 
+    LaunchedEffect(Unit) {
+        if (!Settings.canDrawOverlays(context)) {
+            requestOverlayPermission(context) // 권한 요청
+        }
+    }
+
+
     val elapsedTime = remember(startTime, endTime) {
         startTime?.let { start ->
             endTime?.let { end ->
@@ -60,7 +65,7 @@ fun QuickTimerScreen(modifier: Modifier = Modifier, viewModel: QuickTimerViewMod
 
     LaunchedEffect(onTimerFinish) {
         if (onTimerFinish) {
-            playNotificationSound(context)
+            //playNotificationSound(context)
             viewModel.resetTimer() // 알람 후 타이머 초기화
         }
     }
