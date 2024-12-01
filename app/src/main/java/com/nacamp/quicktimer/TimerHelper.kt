@@ -6,32 +6,25 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class TimerHelper(
+abstract class TimerHelper(
     private val coroutineScope: CoroutineScope,
+    private val durationMillis: Long ,
     private val intervalMillis: Long = 1000L
 ) {
     private var timerJob: Job? = null
     private var remainingTime: Long = 0L
 
-    fun startTimer(
-        durationMillis: Long,
-        onTick: (remainingTime: Long) -> Unit,
-        onFinish: () -> Unit
-    ) {
-        //stopTimer() // 기존 타이머 중지
-        if (timerJob?.isActive == true) return
-        Log.d("TimerHelper", "111remainingTime: $remainingTime")
-        if (remainingTime == 0L) {
-            remainingTime = durationMillis
-        }
+    init {
+        remainingTime = durationMillis
+    }
 
+    fun startTimer() {
+        if (timerJob?.isActive == true) return
         timerJob = coroutineScope.launch {
-            //var remainingTime = durationMillis
             while (remainingTime > 0) {
                 onTick(remainingTime)
                 delay(intervalMillis)
                 remainingTime -= intervalMillis
-                Log.d("TimerHelper", "remainingTime: $remainingTime")
             }
             onFinish()
             resetTimer()
@@ -60,4 +53,7 @@ class TimerHelper(
     private fun resetTimer() {
         remainingTime = 0L
     }
+
+    abstract fun onTick(remainingTime: Long)
+    abstract fun onFinish()
 }

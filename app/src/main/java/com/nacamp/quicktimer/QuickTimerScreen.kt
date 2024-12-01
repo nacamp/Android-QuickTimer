@@ -26,6 +26,8 @@ import java.util.Date
 import java.util.Locale
 import android.provider.Settings
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 
 fun requestOverlayPermission(context: Context) {
     if (!Settings.canDrawOverlays(context)) {
@@ -65,12 +67,12 @@ fun QuickTimerScreen(modifier: Modifier = Modifier, viewModel: QuickTimerViewMod
 //    }
 
 
-    LaunchedEffect(uiState.onTimerFinish) {
-        if (uiState.onTimerFinish) {
-            //playNotificationSound(context)
-            viewModel.resetTimer() // 알람 후 타이머 초기화
-        }
-    }
+//    LaunchedEffect(uiState.onTimerFinish) {
+//        if (uiState.onTimerFinish) {
+//            //playNotificationSound(context)
+//            viewModel.resetTimer() // 알람 후 타이머 초기화
+//        }
+//    }
 
     Column(
         modifier = Modifier
@@ -142,13 +144,7 @@ fun QuickTimerScreen(modifier: Modifier = Modifier, viewModel: QuickTimerViewMod
                 modifier = Modifier,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (uiState.isRunning || uiState.buttonState == "Paused") {
-                    // 중앙 텍스트
-                    Text(
-                        text = "${(uiState.timeLeft / 1000 / 60).toInt()} : ${(uiState.timeLeft / 1000 % 60).toInt()}",
-                        fontSize = 24.sp
-                    )
-                } else {
+                if ( uiState.isDone) {
                     NumberPicker(
                         value = uiState.selectedMinutes,
                         range = 0..90,
@@ -157,32 +153,37 @@ fun QuickTimerScreen(modifier: Modifier = Modifier, viewModel: QuickTimerViewMod
                         }
                     )
                     Text(text = "Min")
+
+                } else {
+                    // 중앙 텍스트
+                    Text(
+                        text = "${(uiState.timeLeft / 1000 / 60).toInt()} : ${(uiState.timeLeft / 1000 % 60).toInt()}",
+                        fontSize = 24.sp
+                    )
                 }
                 Spacer(modifier = Modifier.width(10.dp))
-                when (uiState.buttonState) {
-                    "Start" -> Button(
-                        onClick = { viewModel.startTimer() }
+                if(uiState.isRunning){
+                    Button(
+                        onClick = { viewModel.pauseTimer() }
                     ) {
-                        Text("Start")
+                        Text("Pause")
                     }
-
-                    "Running" -> {
-                        Button(
-                            onClick = { viewModel.pauseTimer() }
-                        ) {
-                            Text("Pause")
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Button(
-                            onClick = { viewModel.cancelTimer() }
-                        ) {
-                            Text("Cancel")
-                        }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Button(
+                        onClick = { viewModel.cancelTimer() }
+                    ) {
+                        Text("Cancel")
                     }
-
-                    "Paused" -> {
+                }else{
+                    if(uiState.isDone) {
                         Button(
                             onClick = { viewModel.startTimer() }
+                        ) {
+                            Text("Start")
+                        }
+                    } else {
+                        Button(
+                            onClick = { viewModel.restartTimer() }
                         ) {
                             Text("Restart")
                         }
@@ -192,6 +193,7 @@ fun QuickTimerScreen(modifier: Modifier = Modifier, viewModel: QuickTimerViewMod
                             Text("Cancel")
                         }
                     }
+
                 }
             }
         }

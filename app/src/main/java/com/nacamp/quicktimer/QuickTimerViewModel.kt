@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.compose.runtime.*
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.AndroidViewModel
@@ -26,6 +27,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /*
 TODO:
@@ -38,54 +42,36 @@ WorkManager: foreground service 사용하기
 data class QuickTimerState(
     val timeLeft: Long = 0L,
     val isRunning: Boolean = false,
-    val buttonState: String = "Start",
+    val isDone: Boolean = true,
     val selectedMinutes: Int = 5,
     val totalMillis: Long = 0L,
-    val onTimerFinish: Boolean = false,
 )
 
 class QuickTimerViewModel(application: Application) : AndroidViewModel(application) {
-    private val context = application.applicationContext
-    private val workManager = WorkManager.getInstance(application)
-    private var timerJob: Job? = null
+    private val _context = application.applicationContext
+    private val _workManager = WorkManager.getInstance(application)
+    private val _coroutineScope = CoroutineScope(Dispatchers.Default)
+    private var _timerHelper: TimerHelper? = null
     private val _timeLeft = MutableStateFlow(0L)
-    //val timeLeft: State<Long> get() = _timeLeft
-
     private val _isRunning = MutableStateFlow(false)
-    //val isRunning: State<Boolean> get() = _isRunning
-
-    private val _buttonState = MutableStateFlow("Start")
-//    val buttonState: State<String> get() = _buttonState
-
+    private val _isDone = MutableStateFlow(true)
     private val _selectedMinutes = MutableStateFlow(5) // 초기값 설정
-//    val selectedMinutes: State<Int> get() = _selectedMinutes
+    private var _mediaPlayer: MediaPlayerHelper? = null
 
-//    private val _startTime = mutableStateOf<Long?>(null) // 시작 시간 (Epoch milliseconds)
-//    val startTime: State<Long?> get() = _startTime
-//
-//    private val _endTime = mutableStateOf<Long?>(null) // 종료 시간 (Epoch milliseconds)
-//    val endTime: State<Long?> get() = _endTime
-
-    private val totalMillis: Long
+    private val _totalMillis: Long
         get() = _selectedMinutes.value   * 1000L // 항상 최신 값을 계산
-
-    private val _onTimerFinish = MutableStateFlow(false) // 타이머 완료 이벤트
-//    val onTimerFinish = _onTimerFinish.asStateFlow()
-
 
     val uiState: StateFlow<QuickTimerState> = combine(
         _timeLeft,
         _isRunning,
-        _buttonState,
+        _isDone,
         _selectedMinutes,
-        _onTimerFinish
-    ) { timeLeft, isRunning, buttonState, selectedMinutes, onTimerFinish ->
+    ) { timeLeft, isRunning, isDone, selectedMinutes->
         QuickTimerState(
             timeLeft = timeLeft,
             isRunning = isRunning,
-            buttonState = buttonState,
+            isDone = isDone,
             selectedMinutes = selectedMinutes,
-            onTimerFinish = onTimerFinish
         )
     }.stateIn(
         viewModelScope,
@@ -94,80 +80,76 @@ class QuickTimerViewModel(application: Application) : AndroidViewModel(applicati
     )
 
     fun saveSelectedMinutes(minutes: Int) {
-        val sharedPreferences = context.getSharedPreferences("QuickTimerPrefs", Context.MODE_PRIVATE)
+        val sharedPreferences = _context.getSharedPreferences("QuickTimerPrefs", Context.MODE_PRIVATE)
         sharedPreferences.edit().putInt("SELECTED_MINUTES", minutes).apply()
         _selectedMinutes.value = minutes
     }
 
     fun loadSelectedMinutes() {
-        val sharedPreferences = context.getSharedPreferences("QuickTimerPrefs", Context.MODE_PRIVATE)
+        val sharedPreferences = _context.getSharedPreferences("QuickTimerPrefs", Context.MODE_PRIVATE)
         val savedMinutes = sharedPreferences.getInt("SELECTED_MINUTES", 5) // 기본값은 5
         _selectedMinutes.value = savedMinutes
     }
 
-    private var mediaPlayer: MediaPlayerHelper? = null
+
     init {
         loadSelectedMinutes()
-        mediaPlayer = MediaPlayerHelper(context)
-        mediaPlayer?.prepare()
+        _mediaPlayer = MediaPlayerHelper(_context)
+        _mediaPlayer?.prepare()
     }
 
     fun updateSelectedMinutes(minutes: Int) {
         _selectedMinutes.value = minutes
     }
 
-    fun startTimer() {
-        if (timerJob?.isActive == true) return
-        saveSelectedMinutes(_selectedMinutes.value) // 선택한 시간 저장
-        _timeLeft.value = if (_timeLeft.value > 0) _timeLeft.value else totalMillis
-//        if(_timeLeft.value == totalMillis) {
-//            _startTime.value = System.currentTimeMillis()
-//        }
-        _isRunning.value = true
-        _buttonState.value = "Running"
-        timerJob = viewModelScope.launch {
-            var remainingTime = _timeLeft.value.takeIf { it > 0 } ?: totalMillis // 남은 시간 또는 전체 시간
-            while (remainingTime > 0 && isActive) {
-                delay(1000L)
-                remainingTime -= 1000L
+    fun setTimerHelper() {
+        _timerHelper = object : TimerHelper(_coroutineScope, _totalMillis, 1000){
+            override fun onTick(remainingTime: Long) {
                 _timeLeft.value = remainingTime
             }
-            if (remainingTime <= 0) {
+            override fun onFinish() {
+                Log.d("jimmy", "xxxxxxx")
+                _timeLeft.value = 0L
                 _isRunning.value = false
-                _buttonState.value = "Start"
-                _onTimerFinish.value = true
-//                _endTime.value = System.currentTimeMillis()
-                showFullScreenNotification(context)
-                mediaPlayer?.start()
+                _isDone.value = true
+                showFullScreenNotification(_context)
+                _mediaPlayer?.start()
                 // 10초 후 알림 중단
                 CoroutineScope(Dispatchers.Main).launch {
                     delay(3_000L) // 10초 대기
-                    mediaPlayer?.release() // 알림 중단
+                    _mediaPlayer?.pause() // 알림 중단
                 }
             }
         }
     }
 
+    fun startTimer() {
+        setTimerHelper()
+        _timerHelper?.startTimer()
+        _isRunning.value = true
+        _isDone.value = false
+//        _buttonState.value = "Running"
+        saveSelectedMinutes(_selectedMinutes.value) // 선택한 시간 저장
+    }
+    fun restartTimer() {
+        _timerHelper?.startTimer()
+        _isRunning.value = true
+    }
+
     fun pauseTimer() {
+        _timerHelper?.pauseTimer()
         _isRunning.value = false
-        _buttonState.value = "Paused"
-        timerJob?.cancel() // 현재 타이머를 중단
     }
 
     fun cancelTimer() {
+        _timerHelper?.stopTimer()
         _isRunning.value = false
-        _buttonState.value = "Start"
-        _timeLeft.value = totalMillis
-        timerJob?.cancel()
-//        _startTime.value = null // 시작 시간 초기화
-//        _endTime.value = null // 종료 시간 초기화
+        _isDone.value = true
     }
 
     fun resetTimer() {
-        _isRunning.value = false
-        _buttonState.value = "Start"
-        _timeLeft.value = totalMillis
-        _onTimerFinish.value = false // 이벤트 초기화
+//        _isRunning.value = false
+//        _timeLeft.value = totalMillis
     }
 
     fun showFullScreenNotification(context: Context) {
