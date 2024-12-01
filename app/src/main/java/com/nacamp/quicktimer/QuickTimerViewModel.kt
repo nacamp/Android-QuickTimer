@@ -13,41 +13,85 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+/*
+TODO:
+1. 모델에서 나머지
+TimerState: 에서만 변수접근
+WorkManager: foreground service 사용하기
+    : 용도는 타이머가 있는 동장은 포그라운서비스...
+2. 타이머는 TimerHelper
+ */
+data class QuickTimerState(
+    val timeLeft: Long = 0L,
+    val isRunning: Boolean = false,
+    val buttonState: String = "Start",
+    val selectedMinutes: Int = 5,
+    val totalMillis: Long = 0L,
+    val onTimerFinish: Boolean = false,
+)
+
 class QuickTimerViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application.applicationContext
+    private val workManager = WorkManager.getInstance(application)
     private var timerJob: Job? = null
-    private val _timeLeft = mutableStateOf(0L)
-    val timeLeft: State<Long> get() = _timeLeft
+    private val _timeLeft = MutableStateFlow(0L)
+    //val timeLeft: State<Long> get() = _timeLeft
 
-    private val _isRunning = mutableStateOf(false)
-    val isRunning: State<Boolean> get() = _isRunning
+    private val _isRunning = MutableStateFlow(false)
+    //val isRunning: State<Boolean> get() = _isRunning
 
-    private val _buttonState = mutableStateOf("Start")
-    val buttonState: State<String> get() = _buttonState
+    private val _buttonState = MutableStateFlow("Start")
+//    val buttonState: State<String> get() = _buttonState
 
-    private val _selectedMinutes = mutableStateOf(5) // 초기값 설정
-    val selectedMinutes: State<Int> get() = _selectedMinutes
+    private val _selectedMinutes = MutableStateFlow(5) // 초기값 설정
+//    val selectedMinutes: State<Int> get() = _selectedMinutes
 
-    private val _startTime = mutableStateOf<Long?>(null) // 시작 시간 (Epoch milliseconds)
-    val startTime: State<Long?> get() = _startTime
-
-    private val _endTime = mutableStateOf<Long?>(null) // 종료 시간 (Epoch milliseconds)
-    val endTime: State<Long?> get() = _endTime
+//    private val _startTime = mutableStateOf<Long?>(null) // 시작 시간 (Epoch milliseconds)
+//    val startTime: State<Long?> get() = _startTime
+//
+//    private val _endTime = mutableStateOf<Long?>(null) // 종료 시간 (Epoch milliseconds)
+//    val endTime: State<Long?> get() = _endTime
 
     private val totalMillis: Long
         get() = _selectedMinutes.value   * 1000L // 항상 최신 값을 계산
 
     private val _onTimerFinish = MutableStateFlow(false) // 타이머 완료 이벤트
-    val onTimerFinish = _onTimerFinish.asStateFlow()
+//    val onTimerFinish = _onTimerFinish.asStateFlow()
+
+
+    val uiState: StateFlow<QuickTimerState> = combine(
+        _timeLeft,
+        _isRunning,
+        _buttonState,
+        _selectedMinutes,
+        _onTimerFinish
+    ) { timeLeft, isRunning, buttonState, selectedMinutes, onTimerFinish ->
+        QuickTimerState(
+            timeLeft = timeLeft,
+            isRunning = isRunning,
+            buttonState = buttonState,
+            selectedMinutes = selectedMinutes,
+            onTimerFinish = onTimerFinish
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        QuickTimerState()
+    )
 
     fun saveSelectedMinutes(minutes: Int) {
         val sharedPreferences = context.getSharedPreferences("QuickTimerPrefs", Context.MODE_PRIVATE)
@@ -76,9 +120,9 @@ class QuickTimerViewModel(application: Application) : AndroidViewModel(applicati
         if (timerJob?.isActive == true) return
         saveSelectedMinutes(_selectedMinutes.value) // 선택한 시간 저장
         _timeLeft.value = if (_timeLeft.value > 0) _timeLeft.value else totalMillis
-        if(_timeLeft.value == totalMillis) {
-            _startTime.value = System.currentTimeMillis()
-        }
+//        if(_timeLeft.value == totalMillis) {
+//            _startTime.value = System.currentTimeMillis()
+//        }
         _isRunning.value = true
         _buttonState.value = "Running"
         timerJob = viewModelScope.launch {
@@ -92,7 +136,7 @@ class QuickTimerViewModel(application: Application) : AndroidViewModel(applicati
                 _isRunning.value = false
                 _buttonState.value = "Start"
                 _onTimerFinish.value = true
-                _endTime.value = System.currentTimeMillis()
+//                _endTime.value = System.currentTimeMillis()
                 showFullScreenNotification(context)
                 mediaPlayer?.start()
                 // 10초 후 알림 중단
@@ -115,8 +159,8 @@ class QuickTimerViewModel(application: Application) : AndroidViewModel(applicati
         _buttonState.value = "Start"
         _timeLeft.value = totalMillis
         timerJob?.cancel()
-        _startTime.value = null // 시작 시간 초기화
-        _endTime.value = null // 종료 시간 초기화
+//        _startTime.value = null // 시작 시간 초기화
+//        _endTime.value = null // 종료 시간 초기화
     }
 
     fun resetTimer() {
