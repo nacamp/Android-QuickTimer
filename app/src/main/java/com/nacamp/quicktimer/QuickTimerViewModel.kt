@@ -14,6 +14,9 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.OneTimeWorkRequest
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -118,7 +121,9 @@ class QuickTimerViewModel(application: Application) : AndroidViewModel(applicati
                 CoroutineScope(Dispatchers.Main).launch {
                     delay(3_000L) // 10초 대기
                     _mediaPlayer?.pause() // 알림 중단
+                    cancelWorker("TIMER_RUNNING_WORKER_TAG")
                 }
+
             }
         }
     }
@@ -128,8 +133,17 @@ class QuickTimerViewModel(application: Application) : AndroidViewModel(applicati
         _timerHelper?.startTimer()
         _isRunning.value = true
         _isDone.value = false
-//        _buttonState.value = "Running"
         saveSelectedMinutes(_selectedMinutes.value) // 선택한 시간 저장
+        //_workManager.enqueue(OneTimeWorkRequest.from(TimerRunningWorker::class.java))
+        val workRequest = OneTimeWorkRequestBuilder<TimerRunningWorker>()
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST) // WorkManager 작업을 즉시 실행
+            .addTag("TIMER_RUNNING_WORKER_TAG") // 태그 지정
+            .build()
+        _workManager.enqueue(workRequest)
+    }
+
+    fun cancelWorker(tag: String) {
+        _workManager.cancelAllWorkByTag(tag)
     }
     fun restartTimer() {
         _timerHelper?.startTimer()

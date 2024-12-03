@@ -24,12 +24,15 @@ class MediaPlayerHelper(private val context: Context) {
     }
 
     fun start() {
-        if (isPaused) {
-            mediaPlayer?.start()
-            isPaused = false
-        } else {
-            mediaPlayer?.start()
-        }
+        //잠시 comment
+//        if (isPaused) {
+////            // TODO: 나중에 수정
+////            mediaPlayer?.setVolume(0.01F, 0.01F)
+//            mediaPlayer?.start()
+//            isPaused = false
+//        } else {
+//            mediaPlayer?.start()
+//        }
     }
 
     fun pause() {

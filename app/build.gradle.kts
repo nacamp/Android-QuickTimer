@@ -69,4 +69,6 @@ dependencies {
     implementation(libs.numberpicker)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.core)
+    implementation("androidx.work:work-runtime-ktx:2.8.1") // WorkManager
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.1") // .collectAsStateWithLifecycle()
 }

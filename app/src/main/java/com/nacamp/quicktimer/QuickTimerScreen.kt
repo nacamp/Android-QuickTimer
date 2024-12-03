@@ -1,5 +1,6 @@
 package com.nacamp.quicktimer
 
+import android.app.Activity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -11,7 +12,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
@@ -25,6 +28,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import android.provider.Settings
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +59,17 @@ fun QuickTimerScreen(modifier: Modifier = Modifier, viewModel: QuickTimerViewMod
     LaunchedEffect(Unit) {
         if (!Settings.canDrawOverlays(context)) {
             requestOverlayPermission(context) // 권한 요청
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(context, "android.permission.POST_NOTIFICATIONS")
+                != PackageManager.PERMISSION_GRANTED) {
+
+                ActivityCompat.requestPermissions(
+                    context as Activity,
+                    arrayOf("android.permission.POST_NOTIFICATIONS"),
+                    1001
+                )
+            }
         }
     }
 
