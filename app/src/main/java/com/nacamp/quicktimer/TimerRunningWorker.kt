@@ -20,26 +20,42 @@ import kotlinx.coroutines.delay
 import kotlin.coroutines.cancellation.CancellationException
 
 
-class TimerRunningWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
+class TimerRunningWorker(
+    ctx: Context,
+    params: WorkerParameters,
+    private val timerNotificationHelper: TimerNotificationHelper
+) : CoroutineWorker(ctx, params) {
 
     override suspend fun doWork(): Result {
         return try {
-            Log.d("jimmy", "doWork success")
-            NotificationHelper.createNotificationChannel(
-                applicationContext,
-                TIMER_RUNNING_CHANNEL,
-                "Timer Running",
-                "Notifications for running timers"
-            )
-
-            val notification = NotificationHelper.getNotificationBuilder(applicationContext, TIMER_RUNNING_CHANNEL).build()
+//            val notificationHelper = TimerNotificationHelper(applicationContext)
+//            notificationHelper.createTimerNotificationChannels()
+            timerNotificationHelper.createTimerNotificationChannels()
 
             val foregroundInfo = ForegroundInfo(
                 TIMER_RUNNING_NOTIFICATION_ID,
-                notification,
+                timerNotificationHelper.getRunningNotificationBuilder().build(),
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0
             )
             setForeground(foregroundInfo)
+
+
+//            Log.d("jimmy", "doWork success")
+//            NotificationHelper.createNotificationChannel(
+//                applicationContext,
+//                TIMER_RUNNING_CHANNEL,
+//                "Timer Running",
+//                "Notifications for running timers"
+//            )
+//
+//            val notification = NotificationHelper.getNotificationBuilder(applicationContext, TIMER_RUNNING_CHANNEL).build()
+//
+//            val foregroundInfo = ForegroundInfo(
+//                TIMER_RUNNING_NOTIFICATION_ID,
+//                notification,
+//                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0
+//            )
+//            setForeground(foregroundInfo)
             // TODO
 //            xxxx.xxxState.collectLatest { state ->
 //                if (state.isDone) {
@@ -65,47 +81,47 @@ class TimerRunningWorker(ctx: Context, params: WorkerParameters) : CoroutineWork
         }
     }
 }
-private const val TIMER_RUNNING_CHANNEL = "timer_running_channel"
-private const val TIMER_COMPLETED_CHANNEL = "timer_completed_channel"
-const val TIMER_RUNNING_NOTIFICATION_ID = 6
-
-object NotificationHelper {
-
-    fun createNotificationChannel(context: Context, channelId: String, channelName: String, description: String) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                channelName,
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                this.description = description
-            }
-            val notificationManager =
-                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
-        }
-    }
-
-    fun getNotificationBuilder(context: Context, channelId: String): NotificationCompat.Builder {
-        val fullScreenIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        }
-
-        val fullScreenPendingIntent = PendingIntent.getActivity(
-            context,
-            0,
-            fullScreenIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        return NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_menu_recent_history) // 작은 아이콘 설정
-            .setContentTitle("Timer")
-            .setContentText("working")
-            .setPriority(NotificationCompat.PRIORITY_HIGH) // 우선순위 설정
-            .setCategory(NotificationCompat.CATEGORY_ALARM) // 긴급 카테고리 설정
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // android:showOnLockScreen="true"
-            .setFullScreenIntent(fullScreenPendingIntent, true) // Full-Screen Intent 설정
-            .setContentIntent(fullScreenPendingIntent) // 클릭시 앱이동
-    }
-}
+//private const val TIMER_RUNNING_CHANNEL = "timer_running_channel"
+//private const val TIMER_COMPLETED_CHANNEL = "timer_completed_channel"
+//const val TIMER_RUNNING_NOTIFICATION_ID = 6
+//
+//object NotificationHelper {
+//
+//    fun createNotificationChannel(context: Context, channelId: String, channelName: String, description: String) {
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//            val channel = NotificationChannel(
+//                channelId,
+//                channelName,
+//                NotificationManager.IMPORTANCE_HIGH
+//            ).apply {
+//                this.description = description
+//            }
+//            val notificationManager =
+//                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+//            notificationManager.createNotificationChannel(channel)
+//        }
+//    }
+//
+//    fun getNotificationBuilder(context: Context, channelId: String): NotificationCompat.Builder {
+//        val fullScreenIntent = Intent(context, MainActivity::class.java).apply {
+//            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+//        }
+//
+//        val fullScreenPendingIntent = PendingIntent.getActivity(
+//            context,
+//            0,
+//            fullScreenIntent,
+//            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+//        )
+//
+//        return NotificationCompat.Builder(context, channelId)
+//            .setSmallIcon(android.R.drawable.ic_menu_recent_history) // 작은 아이콘 설정
+//            .setContentTitle("Timer")
+//            .setContentText("working")
+//            .setPriority(NotificationCompat.PRIORITY_HIGH) // 우선순위 설정
+//            .setCategory(NotificationCompat.CATEGORY_ALARM) // 긴급 카테고리 설정
+//            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // android:showOnLockScreen="true"
+//            .setFullScreenIntent(fullScreenPendingIntent, true) // Full-Screen Intent 설정
+//            .setContentIntent(fullScreenPendingIntent) // 클릭시 앱이동
+//    }
+//}
